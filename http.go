@@ -16,23 +16,23 @@ import (
 )
 
 type Client struct {
-	ResolveTimeout   time.Duration
-	ConnectTimeout   time.Duration
-	HandshakeTimeout time.Duration
-	TlsIdle time.Duration
-	TlsInterval   time.Duration
-	TlsCount int
-	ReadWriteTimeout time.Duration
+	ResolveTimeout      time.Duration
+	ConnectTimeout      time.Duration
+	TLSHandshakeTimeout time.Duration
+	TCPIdle             time.Duration
+	TCPInterval         time.Duration
+	TCPCount            int
+	ReadWriteTimeout    time.Duration
 }
 
 var DefaultClient = &Client{
-	ResolveTimeout: 1 * time.Second,
-	ConnectTimeout: 1 * time.Second,
-	HandshakeTimeout: 1 * time.Second,
-	TlsIdle: 1 * time.Second,
-	TlsInterval: 1 * time.Second,
-	TlsCount: 3,
-	ReadWriteTimeout: 60 * time.Second,
+	ResolveTimeout:      1 * time.Second,
+	ConnectTimeout:      1 * time.Second,
+	TLSHandshakeTimeout: 1 * time.Second,
+	TCPIdle:             1 * time.Second,
+	TCPInterval:         1 * time.Second,
+	TCPCount:            3,
+	ReadWriteTimeout:    60 * time.Second,
 }
 
 const defaultNs = "8.8.8.8"
@@ -65,7 +65,7 @@ func (c *Client) resolve(host string) ([]string, error) {
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
-		TLSHandshakeTimeout: c.HandshakeTimeout,
+		TLSHandshakeTimeout: c.TLSHandshakeTimeout,
 		Dial: func(network, addr string) (net.Conn, error) {
 			var err error
 			host, port, err := net.SplitHostPort(addr)
@@ -93,9 +93,9 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 				conn.SetDeadline(time.Now().Add(c.ReadWriteTimeout))
 				return conn, nil
 			}
-			kaConn.SetKeepAliveIdle(c.TlsIdle)
-			kaConn.SetKeepAliveInterval(c.TlsInterval)
-			kaConn.SetKeepAliveCount(c.TlsCount)
+			kaConn.SetKeepAliveIdle(c.TCPIdle)
+			kaConn.SetKeepAliveInterval(c.TCPInterval)
+			kaConn.SetKeepAliveCount(c.TCPCount)
 			return kaConn, err
 		},
 	}
