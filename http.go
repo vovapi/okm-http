@@ -63,11 +63,12 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 			}
 			if runtime.GOOS == "windows" {
 				conn.SetDeadline(time.Now().Add(c.ReadWriteTimeout))
+				return conn, nil
 			}
 			kaConn, err := tcpkeepalive.EnableKeepAlive(conn)
 			if err != nil {
-				conn.Close()
-				return nil, err
+				conn.SetDeadline(time.Now().Add(c.ReadWriteTimeout))
+				return conn, nil
 			}
 			kaConn.SetKeepAliveIdle(c.TlsIdle)
 			kaConn.SetKeepAliveInterval(c.TlsInterval)
