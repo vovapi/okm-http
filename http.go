@@ -1,8 +1,8 @@
 package okm_http
 
 import (
-	"context"
 	"github.com/okmeter/tcpkeepalive"
+	"github.com/okmeter/dns"
 	"math/rand"
 	"net"
 	"net/http"
@@ -11,6 +11,8 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"errors"
+	"context"
 )
 
 type Client struct {
@@ -33,13 +35,31 @@ var DefaultClient = &Client{
 	ReadWriteTimeout: 60 * time.Second,
 }
 
+const defaultNs = "8.8.8.8"
+
 func (c *Client) resolve(host string) ([]string, error) {
 	resolver := net.Resolver{
 		PreferGo: true,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), c.ResolveTimeout)
 	defer cancel()
-	return resolver.LookupHost(ctx, host)
+	addrs, err := resolver.LookupHost(ctx, host)
+	if len(addrs) == 0 || err != nil {
+		//	Fallback on 8.8.8.8
+    	client := dns.Client{DialTimeout:c.ResolveTimeout}
+    	msg := dns.Msg{}
+    	msg.SetQuestion(host+".", dns.TypeA)
+    	r, _, err := client.Exchange(&msg, defaultNs + ":53")
+    	if err != nil {
+    		return nil, err
+		}
+		addrs := []string{}
+    	for _, ans := range r.Answer {
+    		addr := ans.(*dns.A)
+    		addrs = append(addrs, addr.A.String())
+    	}
+	}
+	return addrs, nil
 }
 
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
@@ -50,6 +70,9 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 			var err error
 			host, port, err := net.SplitHostPort(addr)
 			addrs, err := c.resolve(host)
+			if err != nil || len(addrs) == 0 {
+				return nil, errors.New("Couldn't resolve host: " + host)
+			}
 			var conn net.Conn
 			for i := 1; i <= 2; i++ {
 				randAddr := net.JoinHostPort(addrs[rand.Intn(len(addrs))], port)
