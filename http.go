@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"log"
 )
 
 type Client struct {
@@ -46,6 +47,7 @@ func (c *Client) resolve(host string) ([]string, error) {
 	addrs, err := resolver.LookupHost(ctx, host)
 	if len(addrs) == 0 || err != nil {
 		//	Fallback on 8.8.8.8
+		log.Println("Fallback on " + defaultNs)
 		client := dns.Client{DialTimeout: c.ResolveTimeout}
 		msg := dns.Msg{}
 		msg.SetQuestion(host+".", dns.TypeA)
@@ -53,7 +55,6 @@ func (c *Client) resolve(host string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		addrs := []string{}
 		for _, ans := range r.Answer {
 			addr := ans.(*dns.A)
 			addrs = append(addrs, addr.A.String())
@@ -76,6 +77,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 			var conn net.Conn
 			for i := 1; i <= 2; i++ {
 				randAddr := net.JoinHostPort(addrs[rand.Intn(len(addrs))], port)
+				log.Printf("Try: %d, addr: %s\n", i, randAddr)
 				conn, err = net.DialTimeout(network, randAddr, c.ConnectTimeout)
 				if err == nil {
 					break
